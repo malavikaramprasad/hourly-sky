@@ -223,6 +223,7 @@ button, input { font: inherit; color: inherit; }
 .chart-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 4px; }
 .chart-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink-2); }
+.charts > .legend { flex-wrap: wrap; justify-content: flex-end; margin-bottom: 6px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
 .charts svg { display: block; width: 100%; overflow: visible; }
@@ -235,7 +236,6 @@ button, input { font: inherit; color: inherit; }
 .charts .now text { fill: var(--ink-2); font-weight: 600; }
 .charts .cross { stroke: var(--ink-2); stroke-width: 1; }
 .charts .dot { stroke: var(--surface); stroke-width: 2; }
-.chart-gap { height: 14px; }
 .charts:focus-visible { outline-offset: 6px; border-radius: 6px; }
 .tip { position: absolute; z-index: 5; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,.16); padding: 10px 12px; font-size: 13px; min-width: 190px; display: grid; gap: 4px; }
@@ -366,23 +366,26 @@ td .temp { font-weight: 600; }
       </div>
     </details>
 
-    <details class="sec" data-sec="chart" open>
-      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st">Hourly forecast</span><span class="peek" id="peekChart"></span></summary>
+    <details class="sec" data-sec="temp" open>
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st" id="tempTitle">Temperature by hour</span><span class="peek" id="peekTemp"></span></summary>
       <div class="sec-body">
-        <div class="charts" id="charts" tabindex="0" aria-label="Hourly charts. Use left and right arrow keys to step through hours.">
-          <div class="chart-head">
-            <h3 id="tempTitle">Temperature</h3>
-            <div class="legend">
-              <span><i style="background: var(--series-1)"></i>Temperature</span>
-              <span><i style="background: var(--series-2)"></i>Feels like</span>
-              <span id="bandKey" hidden><i class="band-key"></i>Model range</span>
-            </div>
+        <div class="charts" id="tempWrap" tabindex="0" aria-label="Temperature chart. Use left and right arrow keys to step through hours.">
+          <div class="legend">
+            <span><i style="background: var(--series-1)"></i>Temperature</span>
+            <span><i style="background: var(--series-2)"></i>Feels like</span>
+            <span id="bandKey" hidden><i class="band-key"></i>Model range</span>
           </div>
           <div id="tempChart"></div>
-          <div class="chart-gap"></div>
-          <div class="chart-head"><h3 id="rainTitle">Chance of rain</h3></div>
-          <div id="rainChart"></div>
           <div class="tip" id="tip" hidden></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec" data-sec="rain" open>
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st" id="rainTitle">Chance of rain by hour</span><span class="peek" id="peekRain"></span></summary>
+      <div class="sec-body">
+        <div class="charts" id="rainWrap" tabindex="0" aria-label="Rain chart. Use left and right arrow keys to step through hours.">
+          <div id="rainChart"></div>
         </div>
       </div>
     </details>
@@ -1069,7 +1072,7 @@ document.querySelectorAll('details.sec').forEach((el) => {
   if (k in secState) el.open = !!secState[k];
   el.addEventListener('toggle', () => {
     secState[k] = el.open; store.set('hs.sections', secState);
-    if (k === 'chart' && el.open && state.data) renderCharts(); // charts need their real width
+    if ((k === 'temp' || k === 'rain') && el.open && state.data) renderCharts(); // charts need their real width
   });
 });
 srcSel.addEventListener('change', () => {
@@ -1120,7 +1123,21 @@ function renderDetail() {
   $('#dSub').textContent = [ppH != null ? `${pct(ppH)} rain` : `${fmtP(dv('precipitation_sum', di))} rain`, `wind ${fmtW(dv('wind_speed_10m_max', di))} ${windU()}`].join(' · ');
   const c = confidence(di), confEl = $('#conf'), ens = state.data.ens;
   $('#peekSrc').textContent = [srcLabel(), c ? c.label.toLowerCase() : ''].filter(Boolean).join(' · ');
-  $('#peekChart').textContent = 'Temperature and rain through the day';
+  {
+    const temps = d.hrs.map((j) => hv('temperature_2m', j));
+    const tv = temps.filter((v) => v != null);
+    const at = (v) => fmtHour(hv('time', d.hrs[temps.indexOf(v)]));
+    $('#peekTemp').textContent = tv.length ? `High ${fmtT(Math.max(...tv))} at ${at(Math.max(...tv))} · low ${fmtT(Math.min(...tv))} at ${at(Math.min(...tv))}` : '';
+    const probs = d.hrs.map((j) => hv('precipitation_probability', j));
+    const pv = probs.filter((v) => v != null);
+    if (pv.length) {
+      const top = Math.max(...pv);
+      $('#peekRain').textContent = top < 10 ? 'Little chance of rain' : `Peaks at ${pct(top)} around ${fmtHour(hv('time', d.hrs[probs.indexOf(top)]))}`;
+    } else {
+      const sum = dv('precipitation_sum', di);
+      $('#peekRain').textContent = sum ? `${fmtP(sum)} in total` : 'No rain';
+    }
+  }
   $('#peekStats').textContent = `Sunrise ${fmtClock(dv('sunrise', di))} · sunset ${fmtClock(dv('sunset', di))} · UV ${dv('uv_index_max', di) != null ? Math.round(dv('uv_index_max', di)) : '—'}`;
   $('#peekTable').textContent = `${d.hrs.length} hours, every detail`;
   confEl.hidden = !c;
@@ -1181,7 +1198,8 @@ function barPath(x, y0, w, h, r) {
 }
 function renderCharts() {
   const d = state.days[state.day], hrs = d.hrs, n = hrs.length;
-  const box = $('#tempChart'), W = Math.max(280, box.clientWidth || 600), H = 230;
+  // Both charts share one x-scale; size it from whichever chart section is open
+  const box = $('#tempChart'), W = Math.max(280, chartWidth() || 600), H = 230;
   const step = n > 1 ? (W - M.l - M.r) / (n - 1) : 0;
   const x = (i) => M.l + i * step;
   const temps = hrs.map((j) => T(hv('temperature_2m', j))), feels = hrs.map((j) => T(hv('apparent_temperature', j)));
@@ -1270,15 +1288,19 @@ function renderCharts() {
   if (state.hover != null) showHover(state.hover);
 }
 
-const charts = $('#charts'), tip = $('#tip');
+const chartHosts = [$('#tempWrap'), $('#rainWrap')], tip = $('#tip');
+let tipHost = null;
+// A closed <details> may still lay out its content in some browsers, so ask the section itself
+const isShown = (el) => { const d = el.closest('details'); return (!d || d.open) && el.clientWidth > 0; };
 function hoverIndexFrom(ev) {
-  if (!geom) return null;
-  const rect = $('#tempChart svg').getBoundingClientRect();
+  const svg = ev.target.closest('svg');
+  if (!geom || !svg) return null;
+  const rect = svg.getBoundingClientRect();
   const px = ((ev.clientX - rect.left) / rect.width) * geom.W;
   const i = Math.round((px - M.l) / ((geom.W - M.l - M.r) / Math.max(1, geom.n - 1)));
   return Math.max(0, Math.min(geom.n - 1, i));
 }
-function showHover(i) {
+function showHover(i, host) {
   if (!geom || i == null) return;
   state.hover = i;
   const j = geom.hrs[i], cx = geom.x(i);
@@ -1303,12 +1325,21 @@ function showHover(i) {
     ['Wind', `${fmtW(hv('wind_speed_10m', j))} ${windU()} ${compass(hv('wind_direction_10m', j))}`]);
   tip.innerHTML = `<div class="th">${icon(w.icon, 'sm')}${esc(fmtHour(hv('time', j)))} · ${esc(w.label)}</div>` +
     rows.map(([k, v]) => `<div class="row">${k}<b>${esc(v)}</b></div>`).join('');
-  tip.hidden = false;
-  const cw = charts.clientWidth, tw = tip.offsetWidth;
-  const sx = (cx / geom.W) * $('#tempChart').clientWidth;
-  let left = sx + 14; if (left + tw > cw) left = sx - tw - 14; if (left < 0) left = Math.max(0, Math.min(cw - tw, sx - tw / 2));
-  tip.style.left = left + 'px'; tip.style.top = '34px';
   document.querySelectorAll('#tbody tr').forEach((tr) => tr.classList.toggle('hl', Number(tr.dataset.i) === i));
+  // Show the tooltip in the chart being used, or the first open chart (e.g. when hovering a table row)
+  host = host && isShown(host) ? host : tipHost && isShown(tipHost) ? tipHost : chartHosts.find(isShown);
+  if (!host) { tip.hidden = true; return; }
+  if (tip.parentNode !== host) host.appendChild(tip);
+  tipHost = host;
+  const svg = host.querySelector('svg');
+  tip.hidden = false;
+  const cw = host.clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+  const hr0 = host.getBoundingClientRect(), sr0 = svg.getBoundingClientRect();
+  const sx = (cx / geom.W) * sr0.width;
+  let left = sx + 14; if (left + tw > cw) left = sx - tw - 14; if (left < 0) left = Math.max(0, Math.min(cw - tw, sx - tw / 2));
+  // Beside the crosshair, vertically centred on the chart (the short rain chart lets it overlap a little)
+  const top = sr0.top - hr0.top + Math.min(6, (sr0.height - th) / 2);
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
 }
 function hideHover() {
   state.hover = null; tip.hidden = true;
@@ -1316,18 +1347,20 @@ function hideHover() {
   if (ht) ht.setAttribute('visibility', 'hidden'); if (hr) hr.setAttribute('visibility', 'hidden');
   document.querySelectorAll('#tbody tr.hl').forEach((tr) => tr.classList.remove('hl'));
 }
-charts.addEventListener('pointermove', (e) => { if (e.target.closest('svg')) showHover(hoverIndexFrom(e)); });
-charts.addEventListener('pointerdown', (e) => { if (e.target.closest('svg')) showHover(hoverIndexFrom(e)); });
-charts.addEventListener('pointerleave', hideHover);
-charts.addEventListener('keydown', (e) => {
-  if (!geom) return;
-  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-    e.preventDefault();
-    const cur = state.hover ?? (e.key === 'ArrowRight' ? -1 : geom.n);
-    showHover(Math.max(0, Math.min(geom.n - 1, cur + (e.key === 'ArrowRight' ? 1 : -1))));
-  } else if (e.key === 'Escape') hideHover();
-});
-charts.addEventListener('blur', hideHover);
+for (const host of chartHosts) {
+  host.addEventListener('pointermove', (e) => { if (e.target.closest('svg')) showHover(hoverIndexFrom(e), host); });
+  host.addEventListener('pointerdown', (e) => { if (e.target.closest('svg')) showHover(hoverIndexFrom(e), host); });
+  host.addEventListener('pointerleave', hideHover);
+  host.addEventListener('keydown', (e) => {
+    if (!geom) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const cur = state.hover ?? (e.key === 'ArrowRight' ? -1 : geom.n);
+      showHover(Math.max(0, Math.min(geom.n - 1, cur + (e.key === 'ArrowRight' ? 1 : -1))), host);
+    } else if (e.key === 'Escape') hideHover();
+  });
+  host.addEventListener('blur', hideHover);
+}
 
 /* ---------- table ---------- */
 function renderTable() {
@@ -1368,7 +1401,12 @@ function renderTable() {
 
 /* ---------- resize ---------- */
 let rz;
-new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state.data && geom && $('#tempChart').clientWidth !== geom.lastW) { renderCharts(); if (geom) geom.lastW = $('#tempChart').clientWidth; } }); }).observe($('#tempChart'));
+function chartWidth() {
+  for (const id of ['#tempChart', '#rainChart']) { const el = $(id); if (el.closest('details').open && el.clientWidth) return el.clientWidth; }
+  return 0;
+}
+const ro = new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { const w = chartWidth(); if (state.data && geom && w && w !== geom.lastW) { renderCharts(); if (geom) geom.lastW = w; } }); });
+ro.observe($('#tempChart')); ro.observe($('#rainChart'));
 
 /* ---------- boot ---------- */
 renderUnitButtons(); renderHero();
