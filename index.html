@@ -254,7 +254,34 @@ td .range-cell { color: var(--muted); font-size: 12.5px; }
 .srcbox label { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; }
 .srcbox select { height: 38px; width: auto; max-width: 100%; padding-right: 28px; font-weight: 500; cursor: pointer; }
 .srcbox select:disabled { cursor: default; color: var(--muted); }
-.conf { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+.conf { display: inline-flex; align-items: baseline; gap: 8px; font-size: 13px; line-height: 1.45; color: var(--ink-2); margin-top: 6px; }
+
+/* Main column + side panel */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 16px; align-items: start; }
+.layout.side-closed { grid-template-columns: minmax(0, 1fr) 48px; }
+.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); min-width: 0; }
+.side-sec { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding-inline: 16px; }
+.side-sec .side-ic { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.side-sec .sec-body { display: grid; gap: 12px; padding-bottom: 16px; }
+.side-sec .srcbox select { width: 100%; }
+.side-help { margin: 0; font-size: 12.5px; color: var(--muted); }
+@media (min-width: 901px) {
+  /* open: chevron points right ("tuck away"); closed: a slim rail with vertical title */
+  .side-sec > summary .side-ic { order: 0; }
+  .side-sec > summary .st { order: 1; }
+  .side-sec > summary .chev { order: 2; margin-left: auto; }
+  .side-sec[open] > summary .chev { transform: none; }
+  .side-sec .peek { display: none; }
+  .layout.side-closed .side-sec { padding-inline: 0; }
+  .layout.side-closed .side-sec > summary { flex-direction: column; gap: 12px; padding-block: 14px 18px; }
+  .layout.side-closed .side-sec > summary .chev { order: -1; transform: rotate(180deg); margin: 0; }
+  .layout.side-closed .side-sec .st { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 14px; }
+}
+@media (max-width: 900px) {
+  .layout, .layout.side-closed { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .side-sec { border-radius: 16px; }
+}
 .conf i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .conf b { color: var(--ink); font-weight: 600; }
 .conf.good i { background: var(--good); }
@@ -339,6 +366,7 @@ td .temp { font-weight: 600; }
 
   <nav class="days" id="days" aria-label="Days in range"></nav>
 
+  <div class="layout" id="layout">
   <section class="detail" id="detail" aria-live="polite">
     <div class="dhead">
       <div class="title">
@@ -407,17 +435,26 @@ td .temp { font-weight: 600; }
       </div>
     </details>
 
-    <details class="sec" data-sec="source">
-      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st">Forecast source</span><span class="peek" id="peekSrc"></span></summary>
+  </section>
+
+  <aside class="side" aria-label="Forecast source">
+    <details class="sec side-sec" id="sideSec" data-sec="side" open>
+      <summary title="Show or hide forecast source">
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <svg class="side-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 8.5 4.5-8.5 4.5L3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5"/></svg>
+        <span class="st">Forecast source</span><span class="peek" id="peekSrc"></span>
+      </summary>
       <div class="sec-body">
         <div class="srcbox">
-          <label for="srcSel">Use temperature and rain from</label>
+          <label for="srcSel">Temperature and rain from</label>
           <select id="srcSel" class="input"></select>
           <div class="conf" id="conf" hidden></div>
         </div>
+        <p class="side-help">The blend takes the middle value of all models for each hour. The shaded band on the temperature chart shows how far apart they are.</p>
       </div>
     </details>
-  </section>
+  </aside>
+  </div>
 
   <footer class="foot">
     <span>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Times are local to the city.</span>
@@ -1070,8 +1107,10 @@ const secState = store.get('hs.sections') || {};
 document.querySelectorAll('details.sec').forEach((el) => {
   const k = el.dataset.sec;
   if (k in secState) el.open = !!secState[k];
+  if (k === 'side') $('#layout').classList.toggle('side-closed', !el.open);
   el.addEventListener('toggle', () => {
     secState[k] = el.open; store.set('hs.sections', secState);
+    if (k === 'side') $('#layout').classList.toggle('side-closed', !el.open); // main column widens; charts resize via ResizeObserver
     if ((k === 'temp' || k === 'rain') && el.open && state.data) renderCharts(); // charts need their real width
   });
 });
@@ -1143,7 +1182,7 @@ function renderDetail() {
   confEl.hidden = !c;
   if (c) {
     confEl.className = 'conf ' + c.level;
-    confEl.innerHTML = `<i aria-hidden="true"></i><span><b>${esc(c.label)}</b> · ${c.models} models, typically within ${Math.max(1, Math.round(isF() ? c.spread * 1.8 : c.spread))}°</span>`;
+    confEl.innerHTML = `<i aria-hidden="true"></i><span><b>${esc(c.label)}</b><br>${esc(fmtShort(d.date))} · ${c.models} models, typically within ${Math.max(1, Math.round(isF() ? c.spread * 1.8 : c.spread))}°</span>`;
   }
   let note = '';
   const src = state.view.src;
