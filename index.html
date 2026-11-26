@@ -28,6 +28,9 @@
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --danger: #b3261e;
+  --good: #1f8a4c;
+  --warn: #a86b00;
+  --bad: #c0392b;
   --font-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --radius: 12px;
@@ -39,6 +42,7 @@
     --muted: #7a8b95; --line: #26343d; --accent: #58b7d8; --accent-ink: #06141a;
     --night: rgba(0, 0, 0, 0.22); --sun: #f2b33d; --rain: #5c9fec; --cool: #4a90d9; --warm: #e07a33;
     --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --danger: #f2b8b5;
+    --good: #4cc38a; --warn: #e0a643; --bad: #f07a6a;
     color-scheme: dark;
   }
 }
@@ -47,6 +51,7 @@
   --muted: #7a8b95; --line: #26343d; --accent: #58b7d8; --accent-ink: #06141a;
   --night: rgba(0, 0, 0, 0.22); --sun: #f2b33d; --rain: #5c9fec; --cool: #4a90d9; --warm: #e07a33;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --danger: #f2b8b5;
+    --good: #4cc38a; --warn: #e0a643; --bad: #f07a6a;
   color-scheme: dark;
 }
 
@@ -222,7 +227,23 @@ button, input { font: inherit; color: inherit; }
 .tip .row .k i { width: 10px; height: 2px; display: inline-block; }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
-table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 13.5px; }
+table { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: 13.5px; }
+td .range-cell { color: var(--muted); font-size: 12.5px; }
+
+/* Forecast source + model agreement */
+.srcbox { display: grid; gap: 6px; min-width: 0; justify-items: start; }
+.srcbox label { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; }
+.srcbox select { height: 38px; width: auto; max-width: 100%; padding-right: 28px; font-weight: 500; cursor: pointer; }
+.srcbox select:disabled { cursor: default; color: var(--muted); }
+.conf { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+.conf i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.conf b { color: var(--ink); font-weight: 600; }
+.conf.good i { background: var(--good); }
+.conf.warn i { background: var(--warn); }
+.conf.bad i { background: var(--bad); }
+.band-key { height: 10px !important; border-radius: 2px !important; background: color-mix(in srgb, var(--series-1) 22%, transparent); }
+.charts .band { fill: var(--series-1); fill-opacity: 0.16; }
+.src-note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
 th { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; }
 th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
@@ -310,6 +331,11 @@ td .temp { font-weight: 600; }
           <div class="cond" id="dCond"></div>
         </div>
       </div>
+      <div class="srcbox">
+        <label for="srcSel">Forecast source</label>
+        <select id="srcSel" class="input"></select>
+        <div class="conf" id="conf" hidden></div>
+      </div>
     </div>
     <dl class="stats" id="stats"></dl>
 
@@ -329,6 +355,7 @@ td .temp { font-weight: 600; }
         <div class="legend">
           <span><i style="background: var(--series-1)"></i>Temperature</span>
           <span><i style="background: var(--series-2)"></i>Feels like</span>
+          <span id="bandKey" hidden><i class="band-key"></i>Model range</span>
         </div>
       </div>
       <div id="tempChart"></div>
@@ -347,7 +374,7 @@ td .temp { font-weight: 600; }
   </section>
 
   <footer class="foot">
-    <span>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Times are local to the city.</span>
+    <span>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), blending models from ECMWF, NOAA, DWD, UK Met Office, Météo-France, Environment Canada and JMA. Times are local to the city.</span>
     <span id="source"></span>
   </footer>
 </div>
@@ -379,8 +406,26 @@ const savedPlace = store.get('hs.place');
 const state = {
   place: savedPlace && typeof savedPlace.latitude === 'number' ? savedPlace : DEFAULT_PLACE,
   unit: store.get('hs.unit') === 'F' ? 'F' : 'C',
-  start: null, end: null, data: null, days: [], day: 0, hover: null, sources: [],
+  source: store.get('hs.source') || 'blend',
+  start: null, end: null, data: null, days: [], day: 0, hover: null, sources: [], view: null,
 };
+
+/* ---------- forecast models ---------- */
+// [Open-Meteo model id, short name, who runs it]
+const MODELS = [
+  ['ecmwf_ifs025', 'ECMWF', 'European Centre for Medium-Range Weather Forecasts'],
+  ['gfs_seamless', 'GFS', 'NOAA, United States'],
+  ['icon_seamless', 'ICON', 'Deutscher Wetterdienst, Germany'],
+  ['ukmo_seamless', 'UKMO', 'UK Met Office'],
+  ['meteofrance_seamless', 'Météo-France', 'Météo-France'],
+  ['gem_seamless', 'GEM', 'Environment Canada'],
+  ['jma_seamless', 'JMA', 'Japan Meteorological Agency'],
+];
+const CORE_MODELS = ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'];
+const ENS_VARS = ['temperature_2m', 'apparent_temperature', 'precipitation'];
+const WET_MM = 0.1; // a model "shows rain" in an hour at 0.1 mm or more
+const modelName = (id) => (MODELS.find((m) => m[0] === id) || [id, id])[1];
+const median = (a) => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 /* ---------- dates ---------- */
 const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
@@ -494,10 +539,23 @@ function outfit(di) {
   if (hi - lo >= 7) { add('Layers you can take off', 'layers'); why.push(`That is a ${Math.round(swing)}° swing, so wear layers.`); }
   else if (lo < 8 && mean >= 8) add('Extra layer for the cold hours', 'layers');
 
+  // Models in agreement: the colder end of the model range matters for what to bring
+  const x = state.view && state.view.x;
+  if (x) {
+    const coldest = Math.min(...within(7, 22).map((j) => x.lo[j]).filter((v) => v != null));
+    const typical = Math.min(...within(7, 22).map((j) => hv('temperature_2m', j)).filter((v) => v != null));
+    if (Number.isFinite(coldest) && Number.isFinite(typical) && typical - coldest >= 3) {
+      add('Extra layer, just in case', 'layers');
+      why.push(`Some models run up to ${Math.round(isF() ? (typical - coldest) * 1.8 : typical - coldest)}° colder, so pack an extra layer.`);
+    }
+  }
   const probs = hrs.map((j) => hv('precipitation_probability', j)), hasProb = probs.some((v) => v != null);
-  const maxP = hasProb ? Math.max(...probs.filter((v) => v != null)) : 0;
+  // Share of models showing rain in the wettest hour, used alongside the rain chance
+  const agreeP = x ? Math.max(0, ...hrs.filter((j) => x.wet[j] != null).map((j) => (x.wet[j] / x.count[j]) * 100)) : 0;
+  const maxP = Math.max(hasProb ? Math.max(...probs.filter((v) => v != null)) : 0, agreeP);
   const sum = dv('precipitation_sum', di) ?? hrs.reduce((a, j) => a + (hv('precipitation', j) || 0), 0);
-  const wetHour = hrs.find((j) => (hasProb ? (hv('precipitation_probability', j) || 0) >= 50 : (hv('precipitation', j) || 0) >= 0.3));
+  const wetHour = hrs.find((j) => (hasProb ? (hv('precipitation_probability', j) || 0) >= 50 : (hv('precipitation', j) || 0) >= 0.3)
+    || (x && x.wet[j] != null && x.wet[j] / x.count[j] >= 0.5));
   const when = wetHour != null ? ` from ${fmtHour(hv('time', wetHour))}` : '';
   const snowHour = hrs.find((j) => SNOW_CODES.has(hv('weather_code', j))), snowy = snowHour != null;
   if (snowy) { add('Waterproof boots with grip', 'snow'); add('Warm hat', 'coat'); why.push(`Snow is expected from ${fmtHour(hv('time', snowHour))}.`); }
@@ -565,17 +623,100 @@ async function fetchRange(place, start, end) {
   if (start < recentFloor) parts.push({ kind: 'archive', s: start, e: minD(end, addDays(recentFloor, -1)) });
   if (end >= recentFloor) parts.push({ kind: 'forecast', s: maxD(start, recentFloor), e: end });
   const base = `latitude=${place.latitude}&longitude=${place.longitude}&timezone=auto&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm`;
+  const fc = parts.find((p) => p.kind === 'forecast');
+  const ensP = fc ? fetchModels(base, fc.s, fc.e) : Promise.resolve(null);
   const res = await Promise.all(parts.map((p) => {
     const archive = p.kind === 'archive';
     const host = archive ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast';
     return getJSON(`${host}?${base}&start_date=${p.s}&end_date=${p.e}&hourly=${(archive ? HOURLY_A : HOURLY_F).join(',')}&daily=${(archive ? DAILY_A : DAILY_F).join(',')}`);
   }));
+  const hourly = mergeBlock(res.map((r) => r.hourly), HOURLY_F);
   return {
     timezone: res[0].timezone, elevation: res[0].elevation,
-    hourly: mergeBlock(res.map((r) => r.hourly), HOURLY_F),
-    daily: mergeBlock(res.map((r) => r.daily), DAILY_F),
+    hourly, daily: mergeBlock(res.map((r) => r.daily), DAILY_F),
     sources: parts.map((p) => p.kind),
+    ens: alignModels(await ensP, hourly.time),
   };
+}
+// One request for several models. If the full list is refused, retry with the three core models.
+// Any failure here only removes the comparison; the main forecast still shows.
+async function fetchModels(base, s, e) {
+  for (const ids of [MODELS.map((m) => m[0]), CORE_MODELS]) {
+    try {
+      const j = await getJSON(`https://api.open-meteo.com/v1/forecast?${base}&start_date=${s}&end_date=${e}&hourly=${ENS_VARS.join(',')}&models=${ids.join(',')}`);
+      return { j, ids };
+    } catch {}
+  }
+  return null;
+}
+function alignModels(raw, times) {
+  if (!raw || !raw.j.hourly) return null;
+  const { j, ids } = raw, idx = new Map(times.map((t, i) => [t, i]));
+  const v = {}, present = [], last = {};
+  for (const k of ENS_VARS) v[k] = {};
+  for (const id of ids) {
+    let any = false;
+    for (const k of ENS_VARS) {
+      const arr = new Array(times.length).fill(null);
+      const src = j.hourly[`${k}_${id}`] || (ids.length === 1 ? j.hourly[k] : null);
+      if (src) j.hourly.time.forEach((t, q) => {
+        const i = idx.get(t);
+        if (i != null && src[q] != null) { arr[i] = src[q]; if (k === 'temperature_2m') { any = true; last[id] = t.slice(0, 10); } }
+      });
+      v[k][id] = arr;
+    }
+    if (any) present.push(id);
+  }
+  return present.length >= 2 ? { ids: present, v, last } : null;
+}
+
+/* Build the values every view reads: temperature, feels-like and rain come from the chosen source;
+   the other details always come from Open-Meteo's best match. */
+function buildView() {
+  const d = state.data, ens = d.ens, n = d.hourly.time.length;
+  // state.source is the viewer's choice and is kept; src is what these dates can actually show
+  let src = ens ? state.source : 'best', fallback = null;
+  if (ens && src !== 'blend' && src !== 'best' && !ens.ids.includes(src)) { fallback = MODELS.some((m) => m[0] === src) ? src : null; src = 'blend'; }
+  const h = {}, x = { lo: new Array(n).fill(null), hi: new Array(n).fill(null), count: new Array(n).fill(0), wet: new Array(n).fill(null) };
+  for (const k of ENS_VARS) {
+    h[k] = new Array(n);
+    for (let j = 0; j < n; j++) {
+      const base = d.hourly[k][j];
+      const vals = ens ? ens.ids.map((id) => ens.v[k][id][j]).filter((v) => v != null) : [];
+      h[k][j] = src === 'best' ? base : src === 'blend' ? (vals.length ? median(vals) : base) : ens.v[k][src][j];
+      if (k === 'temperature_2m' && vals.length >= 2) { x.lo[j] = Math.min(...vals); x.hi[j] = Math.max(...vals); x.count[j] = vals.length; }
+      if (k === 'precipitation' && vals.length >= 2) x.wet[j] = vals.filter((v) => v >= WET_MM).length;
+    }
+  }
+  const dd = { temperature_2m_max: [], temperature_2m_min: [], precipitation_sum: [] };
+  state.days.forEach((day, i) => {
+    const t = day.hrs.map((j) => h.temperature_2m[j]).filter((v) => v != null);
+    const p = day.hrs.map((j) => h.precipitation[j]).filter((v) => v != null);
+    dd.temperature_2m_max[i] = t.length ? Math.max(...t) : null;
+    dd.temperature_2m_min[i] = t.length ? Math.min(...t) : null;
+    dd.precipitation_sum[i] = p.length ? p.reduce((a, b) => a + b, 0) : null;
+  });
+  state.view = { h, d: dd, x, src, fallback };
+}
+// Model agreement for one day: average spread across models in waking hours
+function confidence(di) {
+  if (!state.view) return null;
+  const { x } = state.view;
+  const hrs = state.days[di].hrs.filter((j) => { const h = Number(hv('time', j).slice(11, 13)); return h >= 7 && h < 22 && x.count[j] >= 2; });
+  if (!hrs.length) return null;
+  const spread = hrs.reduce((a, j) => a + (x.hi[j] - x.lo[j]), 0) / hrs.length;
+  const models = Math.max(...hrs.map((j) => x.count[j]));
+  const level = spread < 2.5 ? 'good' : spread < 5 ? 'warn' : 'bad';
+  const label = { good: 'Models agree closely', warn: 'Models differ a little', bad: 'Models disagree' }[level];
+  return { spread, models, level, label };
+}
+function rainAgreement(di) {
+  const x = state.view && state.view.x;
+  if (!x) return '';
+  const hrs = state.days[di].hrs.filter((j) => x.wet[j] != null);
+  if (!hrs.length) return '';
+  const n = Math.max(...hrs.map((j) => x.count[j])), wet = Math.max(...hrs.map((j) => x.wet[j]));
+  return wet ? `rain in ${wet} of ${n} models` : `dry in all ${n} models`;
 }
 
 /* ---------- DOM refs ---------- */
@@ -839,6 +980,7 @@ async function load(note) {
     if (idx < 0) idx = state.days.findIndex((x) => x.date === t);
     state.day = Math.max(0, idx);
     state.hover = null;
+    buildView();
     renderAll();
     setStatus(note ? 'info' : '', note);
   } catch (e) {
@@ -851,12 +993,31 @@ async function load(note) {
 function renderAll() {
   renderUnitButtons(); renderHero();
   if (!state.data) return;
-  renderDays(); renderDetail();
+  renderSource(); renderDays(); renderDetail();
   const src = state.data.sources;
-  $('#source').textContent = src.includes('archive') ? 'Older dates use the ERA5 historical archive, which has no rain chance, UV or visibility.' : '';
+  $('#source').textContent = src.includes('archive') ? 'Older dates use the ERA5 historical archive, which has no rain chance, UV, visibility or model comparison.' : '';
 }
-const dv = (k, i) => state.data.daily[k][i];
-const hv = (k, j) => state.data.hourly[k][j];
+// Readers: temperature, feels-like and rain follow the chosen source (see buildView)
+const dv = (k, i) => (state.view && k in state.view.d ? state.view.d[k][i] : state.data.daily[k][i]);
+const hv = (k, j) => (state.view && k in state.view.h ? state.view.h[k][j] : state.data.hourly[k][j]);
+
+const srcSel = $('#srcSel');
+function renderSource() {
+  const ens = state.data.ens;
+  if (!ens) {
+    srcSel.innerHTML = '<option value="best">Open-Meteo best match</option>';
+    srcSel.disabled = true;
+    return;
+  }
+  srcSel.disabled = false;
+  srcSel.innerHTML = `<option value="blend">Blend of ${ens.ids.length} models</option><option value="best">Open-Meteo best match</option>` +
+    ens.ids.map((id) => `<option value="${esc(id)}">${esc(modelName(id))}</option>`).join('');
+  srcSel.value = state.view.src;
+}
+srcSel.addEventListener('change', () => {
+  state.source = srcSel.value; store.set('hs.source', state.source);
+  buildView(); renderAll();
+});
 function isDayHour(j, di) {
   const t = hv('time', j).slice(11, 16), sr = dv('sunrise', di), ss = dv('sunset', di);
   if (!sr || !ss) { const h = Number(t.slice(0, 2)); return h >= 6 && h < 18; }
@@ -865,7 +1026,8 @@ function isDayHour(j, di) {
 
 function renderDays() {
   const nav = $('#days'); nav.innerHTML = '';
-  const lows = state.data.daily.temperature_2m_min.filter((v) => v != null), highs = state.data.daily.temperature_2m_max.filter((v) => v != null);
+  const lows = state.days.map((_, i) => dv('temperature_2m_min', i)).filter((v) => v != null);
+  const highs = state.days.map((_, i) => dv('temperature_2m_max', i)).filter((v) => v != null);
   const gLo = Math.min(...lows), gHi = Math.max(...highs), span = Math.max(gHi - gLo, 1);
   const t = nowParts(state.data.timezone).date;
   state.days.forEach((d, i) => {
@@ -895,6 +1057,21 @@ function renderDetail() {
   $('#dIcon').innerHTML = icon(w.icon, 'lg');
   $('#dTitle').textContent = fmtDay(d.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   $('#dCond').textContent = `${[...new Set([state.place.name, state.place.country].filter(Boolean))].join(', ')} · ${w.label}`;
+  const c = confidence(di), confEl = $('#conf'), ens = state.data.ens;
+  confEl.hidden = !c;
+  if (c) {
+    confEl.className = 'conf ' + c.level;
+    confEl.innerHTML = `<i aria-hidden="true"></i><span><b>${esc(c.label)}</b> · ${c.models} models, typically within ${Math.max(1, Math.round(isF() ? c.spread * 1.8 : c.spread))}°</span>`;
+  }
+  let note = '';
+  const src = state.view.src;
+  if (!ens) note = state.data.sources.includes('archive') && !state.data.sources.includes('forecast') ? 'Past records come from one source.' : 'Model comparison isn’t available right now.';
+  else if (state.view.fallback) note = `${modelName(state.view.fallback)} has no forecast for these dates, so this shows the blend.`;
+  else if (src !== 'blend' && src !== 'best' && ens.last[src] && d.date > ens.last[src]) note = `${modelName(src)} forecasts only reach ${fmtShort(ens.last[src])}. Pick another source for this day.`;
+  else if (src !== 'best') note = 'Temperature and rain from this source; other details from Open-Meteo’s best match.';
+  let noteEl = document.getElementById('srcNote');
+  if (!noteEl) { noteEl = document.createElement('div'); noteEl.id = 'srcNote'; noteEl.className = 'src-note'; $('.srcbox').appendChild(noteEl); }
+  noteEl.textContent = note; noteEl.hidden = !note;
   renderWear(di);
 
   const hrs = d.hrs;
@@ -907,9 +1084,9 @@ function renderDetail() {
   const stats = [
     ['High', fmtT(dv('temperature_2m_max', di)), hiIdx != null ? 'at ' + fmtHour(hv('time', hiIdx)) : ''],
     ['Low', fmtT(dv('temperature_2m_min', di)), loIdx != null ? 'at ' + fmtHour(hv('time', loIdx)) : ''],
-    ['Rain', fmtP(dv('precipitation_sum', di)), pp != null ? `${pct(pp)} max chance` : ''],
+    ['Rain', fmtP(dv('precipitation_sum', di)), [pp != null ? `${pct(pp)} chance` : '', rainAgreement(di)].filter(Boolean).join(', ')],
     ['Wind', `${fmtW(dv('wind_speed_10m_max', di))} ${windU()}`, gusts.length ? `gusts ${fmtW(Math.max(...gusts))}` : ''],
-    ['Humidity', hum.length ? `${Math.round(Math.min(...hum))}–${Math.round(Math.max(...hum))}%` : '—', ''],
+    ['Humidity', hum.length ? (Math.round(Math.min(...hum)) === Math.round(Math.max(...hum)) ? `${Math.round(hum[0])}%` : `${Math.round(Math.min(...hum))}–${Math.round(Math.max(...hum))}%`) : '—', ''],
     ['UV index', uv != null ? String(Math.round(uv)) : '—', uvWord(uv)],
     ['Sunrise', fmtClock(dv('sunrise', di)), ''],
     ['Sunset', fmtClock(dv('sunset', di)), ''],
@@ -943,7 +1120,11 @@ function renderCharts() {
   const step = n > 1 ? (W - M.l - M.r) / (n - 1) : 0;
   const x = (i) => M.l + i * step;
   const temps = hrs.map((j) => T(hv('temperature_2m', j))), feels = hrs.map((j) => T(hv('apparent_temperature', j)));
-  const vals = [...temps, ...feels].filter((v) => v != null);
+  const vx = state.view.x;
+  const bandLo = hrs.map((j) => (vx.lo[j] == null ? null : T(vx.lo[j]))), bandHi = hrs.map((j) => (vx.hi[j] == null ? null : T(vx.hi[j])));
+  const hasBand = bandLo.some((v) => v != null);
+  $('#bandKey').hidden = !hasBand;
+  const vals = [...temps, ...feels, ...bandLo, ...bandHi].filter((v) => v != null);
   $('#tempTitle').textContent = `Temperature by hour (°${state.unit})`;
   if (!vals.length) { box.innerHTML = '<p class="muted">No hourly temperatures for this day.</p>'; $('#rainChart').innerHTML = ''; geom = null; return; }
   let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -975,6 +1156,16 @@ function renderCharts() {
   const now = nowParts(state.data.timezone);
   const nowI = d.date === now.date ? hrs.findIndex((j) => Number(hv('time', j).slice(11, 13)) === now.hour) : -1;
   if (nowI >= 0) s += `<g class="now"><line x1="${x(nowI)}" x2="${x(nowI)}" y1="${M.t - 4}" y2="${H - M.b}"/><text x="${x(nowI)}" y="${M.t - 8}" text-anchor="middle">Now</text></g>`;
+  // model range band: one closed shape per unbroken run of hours
+  if (hasBand) {
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) s += `<path class="band" d="M${run.map((i) => `${x(i).toFixed(1)} ${y(bandHi[i]).toFixed(1)}`).join('L')}L${run.slice().reverse().map((i) => `${x(i).toFixed(1)} ${y(bandLo[i]).toFixed(1)}`).join('L')}Z"/>`;
+      run = [];
+    };
+    bandLo.forEach((v, i) => (v == null ? flush() : run.push(i)));
+    flush();
+  }
   // lines
   s += `<path d="${linePath(xs, feels.map((v) => (v == null ? null : y(v))))}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-linejoin="round"/>`;
   s += `<path d="${linePath(xs, temps.map((v) => (v == null ? null : y(v))))}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round"/>`;
@@ -1039,7 +1230,10 @@ function showHover(i) {
     ['<span class="k"><i style="background:var(--series-1)"></i>Temperature</span>', fmtT(hv('temperature_2m', j))],
     ['<span class="k"><i style="background:var(--series-2)"></i>Feels like</span>', fmtT(hv('apparent_temperature', j))],
   ];
+  const vx = state.view.x;
+  if (vx.lo[j] != null) rows.push(['<span class="k"><i class="band-key"></i>Model range</span>', `${fmtT(vx.lo[j])} to ${fmtT(vx.hi[j])}`]);
   if (hv('precipitation_probability', j) != null) rows.push(['Chance of rain', pct(hv('precipitation_probability', j))]);
+  if (vx.wet[j] != null) rows.push(['Models showing rain', `${vx.wet[j]} of ${vx.count[j]}`]);
   rows.push(['Rain', fmtP(hv('precipitation', j))], ['Humidity', pct(hv('relative_humidity_2m', j))],
     ['Wind', `${fmtW(hv('wind_speed_10m', j))} ${windU()} ${compass(hv('wind_direction_10m', j))}`]);
   tip.innerHTML = `<div class="th">${icon(w.icon, 'sm')}${esc(fmtHour(hv('time', j)))} · ${esc(w.label)}</div>` +
@@ -1073,7 +1267,8 @@ charts.addEventListener('blur', hideHover);
 /* ---------- table ---------- */
 function renderTable() {
   const u = state.unit;
-  const heads = ['Time', 'Sky', `Temp °${u}`, `Feels °${u}`, 'Rain chance', `Rain ${isF() ? 'in' : 'mm'}`, 'Humidity', `Wind ${windU()}`, `Gusts ${windU()}`, 'Cloud', 'UV', 'Visibility'];
+  const vx = state.view.x, hasModels = state.days[state.day].hrs.some((j) => vx.count[j] >= 2);
+  const heads = ['Time', 'Sky', `Temp °${u}`, ...(hasModels ? ['Model range'] : []), `Feels °${u}`, 'Rain chance', ...(hasModels ? ['Models with rain'] : []), `Rain ${isF() ? 'in' : 'mm'}`, 'Humidity', `Wind ${windU()}`, `Gusts ${windU()}`, 'Cloud', 'UV', 'Visibility'];
   $('#thead').innerHTML = heads.map((h) => `<th scope="col">${esc(h)}</th>`).join('');
   const d = state.days[state.day];
   const now = nowParts(state.data.timezone);
@@ -1087,8 +1282,10 @@ function renderTable() {
       <td>${esc(fmtHour(hv('time', j)))}${isNow ? ' · now' : ''}</td>
       <td class="sky">${icon(w.icon, 'sm')}<span>${esc(w.label)}</span></td>
       <td><span class="temp">${fmtT(hv('temperature_2m', j))}</span></td>
+      ${hasModels ? `<td><span class="range-cell">${vx.lo[j] == null ? '—' : `${fmtT(vx.lo[j])} to ${fmtT(vx.hi[j])}`}</span></td>` : ''}
       <td>${fmtT(hv('apparent_temperature', j))}</td>
       <td>${pct(hv('precipitation_probability', j))}</td>
+      ${hasModels ? `<td class="${vx.wet[j] ? '' : 'muted'}">${vx.wet[j] == null ? '—' : `${vx.wet[j]} of ${vx.count[j]}`}</td>` : ''}
       <td class="${p ? '' : 'muted'}">${p == null ? '—' : isF() ? (p / 25.4).toFixed(2) : p.toFixed(1)}</td>
       <td>${pct(hv('relative_humidity_2m', j))}</td>
       <td>${arrow}${fmtW(hv('wind_speed_10m', j))} <span class="muted">${compass(dir)}</span></td>
