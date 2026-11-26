@@ -108,7 +108,7 @@ button, input { font: inherit; color: inherit; }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 /* Date range picker */
-.datebtn { display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer; font-weight: 500; }
+.datebtn { display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer; font-weight: 500; min-width: 0; width: 100%; }
 .datebtn svg { color: var(--muted); flex: none; }
 .datebtn .chev { margin-left: auto; }
 .datebtn #dateText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -138,10 +138,9 @@ button, input { font: inherit; color: inherit; }
 @media (max-width: 640px) { .cal { left: 0; right: 0; width: auto; max-width: none; } }
 
 /* What to wear */
-.wear { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; padding: 16px; border-radius: 12px;
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); }
+.sec-body.wear { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; }
 .eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
-.wear h3 { font: 700 1.35rem/1.2 var(--font-display); margin: 2px 0 6px; }
+.wear h3 { font: 700 1.25rem/1.2 var(--font-display); margin: 0 0 6px; }
 .wear p { margin: 0; color: var(--ink-2); max-width: 62ch; }
 .kit { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .kit li { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 13.5px; font-weight: 500; }
@@ -154,7 +153,7 @@ button, input { font: inherit; color: inherit; }
 .parts .pt { font-size: 12px; color: var(--muted); }
 .parts .pf { font-weight: 600; text-align: right; grid-row: 1; grid-column: 2; }
 .parts .pw { color: var(--ink-2); font-size: 13px; text-align: right; display: inline-flex; gap: 5px; align-items: center; justify-content: flex-end; }
-@media (max-width: 720px) { .wear { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) { .sec-body.wear { grid-template-columns: minmax(0, 1fr); } }
 .day .dwear { font-size: 12px; color: var(--ink-2); display: flex; gap: 5px; align-items: center; border-top: 1px solid var(--line); padding-top: 6px; }
 .day .dwear .ci { width: 14px; height: 14px; }
 
@@ -165,11 +164,13 @@ button, input { font: inherit; color: inherit; }
 
 /* Day strip */
 .days { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
-.day { flex: 0 0 150px; scroll-snap-align: start; text-align: left; border: 1px solid var(--line); background: var(--surface);
+.day { flex: 0 0 124px; scroll-snap-align: start; text-align: left; border: 1px solid var(--line); background: var(--surface);
   border-radius: var(--radius); padding: 12px; cursor: pointer; display: grid; gap: 6px; }
 .day:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
 .day[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.day .dtop { display: flex; justify-content: space-between; align-items: start; }
+.day .dtop { display: flex; justify-content: space-between; align-items: start; gap: 4px; }
+.day .dtop .wx { width: 24px; height: 24px; }
+.day .dname { white-space: nowrap; }
 .day .dname { font-weight: 600; }
 .day .ddate { font-size: 12.5px; color: var(--muted); }
 .day .dcond { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -188,8 +189,26 @@ button, input { font: inherit; color: inherit; }
 .wx .r { stroke: var(--rain); }
 
 /* Detail */
-.detail { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 20px; min-width: 0; }
-.dhead { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; }
+.detail { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 4px 20px; display: grid; min-width: 0; }
+.dhead { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; padding-block: 18px; }
+.dtemp { text-align: right; display: grid; gap: 2px; }
+.hilo { font: 700 2rem/1 var(--font-display); letter-spacing: -0.02em; display: flex; gap: 10px; justify-content: flex-end; align-items: baseline; }
+.hilo .lo { color: var(--muted); font-size: 1.35rem; }
+.dsub { font-size: 13px; color: var(--ink-2); }
+@media (max-width: 520px) { .dtemp { text-align: left; } .hilo { justify-content: flex-start; } }
+
+/* Collapsible sections */
+.sec { border-top: 1px solid var(--line); min-width: 0; }
+.sec > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding-block: 15px; cursor: pointer; user-select: none; }
+.sec > summary::-webkit-details-marker { display: none; }
+.sec > summary:hover .st { color: var(--accent); }
+.sec .chev { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.sec[open] > summary .chev { transform: rotate(90deg); }
+.sec .st { font: 600 15.5px/1.3 var(--font-display); white-space: nowrap; flex: none; }
+@media (max-width: 480px) { .sec .peek { font-size: 12px; } }
+.sec .peek { margin-left: auto; min-width: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sec[open] .peek { visibility: hidden; }
+.sec-body { padding-bottom: 20px; min-width: 0; }
 .dhead .title { display: flex; gap: 12px; align-items: center; }
 .dhead h2 { font: 700 1.5rem/1.15 var(--font-display); margin: 0; }
 .dhead .cond { color: var(--ink-2); }
@@ -310,11 +329,9 @@ td .temp { font-weight: 600; }
     </div>
     <div class="chips">
       <button type="button" class="chip" data-range="today">Today</button>
-      <button type="button" class="chip" data-range="tomorrow">Tomorrow</button>
       <button type="button" class="chip" data-range="3">Next 3 days</button>
       <button type="button" class="chip" data-range="7">Next 7 days</button>
-      <button type="button" class="chip" data-range="weekend">This weekend</button>
-      <span class="note" id="rangeNote">Forecasts reach 16 days ahead. Past dates go back to 1940.</span>
+      <button type="button" class="chip" data-range="weekend">Weekend</button>
     </div>
   </section>
 
@@ -331,50 +348,76 @@ td .temp { font-weight: 600; }
           <div class="cond" id="dCond"></div>
         </div>
       </div>
-      <div class="srcbox">
-        <label for="srcSel">Forecast source</label>
-        <select id="srcSel" class="input"></select>
-        <div class="conf" id="conf" hidden></div>
+      <div class="dtemp">
+        <div class="hilo"><span id="dHi">—</span><span class="lo" id="dLo"></span></div>
+        <div class="dsub" id="dSub"></div>
       </div>
     </div>
-    <dl class="stats" id="stats"></dl>
 
-    <section class="wear" id="wear" aria-labelledby="wearTitle">
-      <div>
-        <div class="eyebrow" id="wearEyebrow">What to wear</div>
-        <h3 id="wearTitle"></h3>
-        <p id="wearWhy"></p>
-        <ul class="kit" id="wearKit" aria-label="Suggested items"></ul>
+    <details class="sec" id="wear" data-sec="wear" open>
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st" id="wearEyebrow">What to wear</span><span class="peek" id="peekWear"></span></summary>
+      <div class="sec-body wear">
+        <div>
+          <h3 id="wearTitle"></h3>
+          <p id="wearWhy"></p>
+          <ul class="kit" id="wearKit" aria-label="Suggested items"></ul>
+        </div>
+        <ol class="parts" id="wearParts" aria-label="By time of day"></ol>
       </div>
-      <ol class="parts" id="wearParts" aria-label="By time of day"></ol>
-    </section>
+    </details>
 
-    <div class="charts" id="charts" tabindex="0" aria-label="Hourly charts. Use left and right arrow keys to step through hours.">
-      <div class="chart-head">
-        <h3 id="tempTitle">Temperature by hour</h3>
-        <div class="legend">
-          <span><i style="background: var(--series-1)"></i>Temperature</span>
-          <span><i style="background: var(--series-2)"></i>Feels like</span>
-          <span id="bandKey" hidden><i class="band-key"></i>Model range</span>
+    <details class="sec" data-sec="chart" open>
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st">Hourly forecast</span><span class="peek" id="peekChart"></span></summary>
+      <div class="sec-body">
+        <div class="charts" id="charts" tabindex="0" aria-label="Hourly charts. Use left and right arrow keys to step through hours.">
+          <div class="chart-head">
+            <h3 id="tempTitle">Temperature</h3>
+            <div class="legend">
+              <span><i style="background: var(--series-1)"></i>Temperature</span>
+              <span><i style="background: var(--series-2)"></i>Feels like</span>
+              <span id="bandKey" hidden><i class="band-key"></i>Model range</span>
+            </div>
+          </div>
+          <div id="tempChart"></div>
+          <div class="chart-gap"></div>
+          <div class="chart-head"><h3 id="rainTitle">Chance of rain</h3></div>
+          <div id="rainChart"></div>
+          <div class="tip" id="tip" hidden></div>
         </div>
       </div>
-      <div id="tempChart"></div>
-      <div class="chart-gap"></div>
-      <div class="chart-head"><h3 id="rainTitle">Chance of rain</h3></div>
-      <div id="rainChart"></div>
-      <div class="tip" id="tip" hidden></div>
-    </div>
+    </details>
 
-    <div class="table-wrap">
-      <table>
-        <thead><tr id="thead"></tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
+    <details class="sec" data-sec="stats">
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st">Day details</span><span class="peek" id="peekStats"></span></summary>
+      <div class="sec-body"><dl class="stats" id="stats"></dl></div>
+    </details>
+
+    <details class="sec" data-sec="table">
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st">Hour by hour</span><span class="peek" id="peekTable"></span></summary>
+      <div class="sec-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="thead"></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec" data-sec="source">
+      <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="st">Forecast source</span><span class="peek" id="peekSrc"></span></summary>
+      <div class="sec-body">
+        <div class="srcbox">
+          <label for="srcSel">Use temperature and rain from</label>
+          <select id="srcSel" class="input"></select>
+          <div class="conf" id="conf" hidden></div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <footer class="foot">
-    <span>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), blending models from ECMWF, NOAA, DWD, UK Met Office, Météo-France, Environment Canada and JMA. Times are local to the city.</span>
+    <span>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Times are local to the city.</span>
     <span id="source"></span>
   </footer>
 </div>
@@ -589,6 +632,7 @@ function renderWear(di) {
   const o = outfit(di), box = $('#wear');
   if (!o) { box.hidden = true; return; }
   box.hidden = false;
+  $('#peekWear').textContent = `${o.short}${o.kit.some((k) => k.icon === 'umbrella') ? ' · umbrella' : ''}`;
   $('#wearEyebrow').textContent = state.days[di].date < nowParts(state.data.timezone).date ? 'What would have suited this day' : 'What to wear';
   $('#wearTitle').textContent = o.title;
   $('#wearWhy').textContent = o.why;
@@ -736,9 +780,7 @@ function fmtCoord(lat, lon) {
 function renderHero() {
   const p = state.place;
   $('#placeName').textContent = p.name;
-  const bits = [[p.admin1, p.country].filter(Boolean).join(', '), fmtCoord(p.latitude, p.longitude)];
-  if (state.data && state.data.elevation != null) bits.push(`${Math.round(isF() ? state.data.elevation * 3.281 : state.data.elevation)} ${isF() ? 'ft' : 'm'} elevation`);
-  if (tz()) bits.push(tz().replace(/_/g, ' '));
+  const bits = [[p.admin1, p.country].filter(Boolean).join(', ')];
   const meta = $('#placeMeta'); meta.textContent = '';
   for (const b of bits.filter(Boolean)) { const s = document.createElement('span'); s.textContent = b; meta.appendChild(s); }
   const ci = document.getElementById('city');
@@ -760,7 +802,8 @@ function chipRange(r) {
   return [t, addDays(t, Number(r) - 1)];
 }
 function fmtRange(s, e) {
-  const f = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const thisYear = s.slice(0, 4) === today().slice(0, 4) && e.slice(0, 4) === s.slice(0, 4);
+  const f = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: thisYear ? undefined : 'numeric', timeZone: 'UTC' });
   if (s === e) return f.format(parse(s));
   try { return f.formatRange(parse(s), parse(e)); } catch { return f.format(parse(s)) + ' – ' + f.format(parse(e)); }
 }
@@ -1014,6 +1057,21 @@ function renderSource() {
     ens.ids.map((id) => `<option value="${esc(id)}">${esc(modelName(id))}</option>`).join('');
   srcSel.value = state.view.src;
 }
+function srcLabel() {
+  const ens = state.data.ens, src = state.view.src;
+  if (!ens || src === 'best') return 'Open-Meteo best match';
+  return src === 'blend' ? `Blend of ${ens.ids.length} models` : modelName(src);
+}
+/* Collapsible sections: remember which are open */
+const secState = store.get('hs.sections') || {};
+document.querySelectorAll('details.sec').forEach((el) => {
+  const k = el.dataset.sec;
+  if (k in secState) el.open = !!secState[k];
+  el.addEventListener('toggle', () => {
+    secState[k] = el.open; store.set('hs.sections', secState);
+    if (k === 'chart' && el.open && state.data) renderCharts(); // charts need their real width
+  });
+});
 srcSel.addEventListener('change', () => {
   state.source = srcSel.value; store.set('hs.source', state.source);
   buildView(); renderAll();
@@ -1032,19 +1090,18 @@ function renderDays() {
   const t = nowParts(state.data.timezone).date;
   state.days.forEach((d, i) => {
     const lo = dv('temperature_2m_min', i), hi = dv('temperature_2m_max', i), w = wmo(dv('weather_code', i));
-    const pp = dv('precipitation_probability_max', i), ps = dv('precipitation_sum', i), o = outfit(i);
+    const pp = dv('precipitation_probability_max', i), ps = dv('precipitation_sum', i);
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'day'; b.setAttribute('aria-pressed', String(i === state.day));
     const name = d.date === t ? 'Today' : d.date === addDays(t, 1) ? 'Tomorrow' : d.date === addDays(t, -1) ? 'Yesterday' : fmtDay(d.date, { weekday: 'short' });
     const left = lo == null ? 0 : ((lo - gLo) / span) * 100, right = hi == null ? 0 : ((gHi - hi) / span) * 100;
-    const rain = [pp != null ? pct(pp) : null, ps != null ? fmtP(ps) : null].filter(Boolean).join(' · ') || 'No rain data';
+    const rain = pp != null ? pct(pp) : ps != null ? fmtP(ps) : '—';
+    b.title = w.label;
     b.innerHTML = `
       <div class="dtop"><div><div class="dname">${esc(name)}</div><div class="ddate">${esc(fmtDay(d.date, { day: 'numeric', month: 'short', year: d.date.slice(0, 4) !== t.slice(0, 4) ? 'numeric' : undefined }))}</div></div>${icon(w.icon)}</div>
-      <div class="dcond">${esc(w.label)}</div>
       <div class="range"><span class="lo">${fmtT(lo)}</span><span class="track"><i style="left:${left}%;right:${right}%"></i></span><span class="hi">${fmtT(hi)}</span></div>
-      <div class="drain"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/></svg>${esc(rain)}</div>
-      ${o ? `<div class="dwear">${ci(o.icon)}${esc(o.short)}</div>` : ''}`;
-    b.setAttribute('aria-label', `${name} ${d.date}: ${w.label}, low ${fmtT(lo)}, high ${fmtT(hi)}, ${rain}${o ? ', wear: ' + o.short : ''}`);
+      <div class="drain"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/></svg>${esc(rain)}</div>`;
+    b.setAttribute('aria-label', `${name} ${d.date}: ${w.label}, low ${fmtT(lo)}, high ${fmtT(hi)}, rain ${rain}`);
     b.addEventListener('click', () => { state.day = i; state.hover = null; renderDays(); renderDetail(); });
     nav.appendChild(b);
   });
@@ -1055,9 +1112,17 @@ function renderDetail() {
   const di = state.day, d = state.days[di]; if (!d) return;
   const w = wmo(dv('weather_code', di));
   $('#dIcon').innerHTML = icon(w.icon, 'lg');
-  $('#dTitle').textContent = fmtDay(d.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  $('#dCond').textContent = `${[...new Set([state.place.name, state.place.country].filter(Boolean))].join(', ')} · ${w.label}`;
+  $('#dTitle').textContent = fmtDay(d.date, { weekday: 'long', day: 'numeric', month: 'long', year: d.date.slice(0, 4) === today().slice(0, 4) ? undefined : 'numeric' });
+  $('#dCond').textContent = `${w.label} in ${state.place.name}`;
+  $('#dHi').textContent = fmtT(dv('temperature_2m_max', di));
+  $('#dLo').textContent = fmtT(dv('temperature_2m_min', di));
+  const ppH = dv('precipitation_probability_max', di);
+  $('#dSub').textContent = [ppH != null ? `${pct(ppH)} rain` : `${fmtP(dv('precipitation_sum', di))} rain`, `wind ${fmtW(dv('wind_speed_10m_max', di))} ${windU()}`].join(' · ');
   const c = confidence(di), confEl = $('#conf'), ens = state.data.ens;
+  $('#peekSrc').textContent = [srcLabel(), c ? c.label.toLowerCase() : ''].filter(Boolean).join(' · ');
+  $('#peekChart').textContent = 'Temperature and rain through the day';
+  $('#peekStats').textContent = `Sunrise ${fmtClock(dv('sunrise', di))} · sunset ${fmtClock(dv('sunset', di))} · UV ${dv('uv_index_max', di) != null ? Math.round(dv('uv_index_max', di)) : '—'}`;
+  $('#peekTable').textContent = `${d.hrs.length} hours, every detail`;
   confEl.hidden = !c;
   if (c) {
     confEl.className = 'conf ' + c.level;
